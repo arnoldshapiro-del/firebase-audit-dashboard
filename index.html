@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Firebase Audit Dashboard — Arnie's 155 Apps</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Inter, system-ui, sans-serif; background: #070c18; color: #e2e8f0; min-height:100vh; }
+
+  /* Header */
+  .header { background: #0a0e1a; border-bottom: 1px solid rgba(20,184,166,0.25); padding: 20px 32px; }
+  .header h1 { font-family: Lora, Georgia, serif; color: #fff; font-size: 28px; margin-bottom: 4px; }
+  .header p { color: #94a3b8; font-size: 14px; }
+
+  /* Stats Bar */
+  .stats-bar { display: flex; gap: 16px; padding: 16px 32px; flex-wrap: wrap; }
+  .stat-card { background: #141a2e; border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 14px 20px; min-width: 140px; }
+  .stat-card .num { font-size: 28px; font-weight: 700; color: #2dd4bf; }
+  .stat-card .label { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .stat-card.warn .num { color: #fcd34d; }
+  .stat-card.danger .num { color: #fca5a5; }
+
+  /* Controls */
+  .controls { display: flex; gap: 12px; padding: 12px 32px; flex-wrap: wrap; align-items: center; }
+  .search-box { background: #141a2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 14px; color: #e2e8f0; font-size: 14px; width: 260px; outline: none; }
+  .search-box:focus { border-color: #14b8a6; }
+  .search-box::placeholder { color: #64748b; }
+  select { background: #141a2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 12px; color: #e2e8f0; font-size: 13px; outline: none; cursor: pointer; }
+  select:focus { border-color: #14b8a6; }
+  .btn { border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; cursor: pointer; font-weight: 600; transition: all 0.15s; }
+  .btn-teal { background: #14b8a6; color: #070c18; }
+  .btn-teal:hover { background: #2dd4bf; }
+  .btn-outline { background: transparent; border: 1px solid rgba(20,184,166,0.4); color: #2dd4bf; }
+  .btn-outline:hover { background: rgba(20,184,166,0.12); }
+  .btn-red { background: transparent; border: 1px solid rgba(239,68,68,0.4); color: #fca5a5; }
+  .btn-red:hover { background: rgba(239,68,68,0.12); }
+  .visible-count { color: #94a3b8; font-size: 13px; margin-left: 8px; }
+
+  /* Table */
+  .table-wrap { padding: 0 32px 120px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: #0f1424; color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; padding: 10px 12px; text-align: left; position: sticky; top: 0; z-index: 2; border-bottom: 1px solid rgba(20,184,166,0.2); cursor: pointer; user-select: none; white-space: nowrap; }
+  thead th:hover { color: #2dd4bf; }
+  thead th .sort-arrow { margin-left: 4px; font-size: 10px; }
+  tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.1s; }
+  tbody tr:hover { background: rgba(20,184,166,0.06); }
+  tbody tr.selected { background: rgba(20,184,166,0.1); }
+  td { padding: 8px 12px; vertical-align: middle; }
+  td.num { color: #64748b; text-align: center; width: 40px; }
+  td.folder { font-weight: 500; color: #e2e8f0; max-width: 320px; word-break: break-all; }
+  td.source { color: #94a3b8; font-size: 12px; }
+  td.notes { color: #64748b; font-size: 12px; font-style: italic; }
+
+  /* Badges */
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; }
+  .badge-yes { background: rgba(34,197,94,0.15); color: #86efac; border: 1px solid rgba(34,197,94,0.3); }
+  .badge-no { background: rgba(239,68,68,0.12); color: #fca5a5; border: 1px solid rgba(239,68,68,0.25); }
+  .badge-auth { background: rgba(245,158,11,0.15); color: #fcd34d; border: 1px solid rgba(245,158,11,0.35); }
+  .badge-full { background: rgba(34,197,94,0.18); color: #4ade80; border: 1px solid rgba(34,197,94,0.45); font-weight:800; }
+  .badge-react { background: rgba(56,189,248,0.12); color: #7dd3fc; border: 1px solid rgba(56,189,248,0.25); }
+  .badge-html { background: rgba(168,85,247,0.12); color: #c4b5fd; border: 1px solid rgba(167,139,250,0.25); }
+  .badge-node { background: rgba(245,158,11,0.12); color: #fcd34d; border: 1px solid rgba(245,158,11,0.25); }
+  .badge-next { background: rgba(20,184,166,0.12); color: #2dd4bf; border: 1px solid rgba(20,184,166,0.25); }
+  .badge-unknown { background: rgba(100,116,139,0.15); color: #94a3b8; border: 1px solid rgba(100,116,139,0.3); }
+
+  /* Netlify link */
+  a.netlify-link { color: #2dd4bf; text-decoration: none; font-size: 12px; }
+  a.netlify-link:hover { text-decoration: underline; color: #5eead4; }
+
+  /* Checkbox */
+  input[type="checkbox"] { width: 16px; height: 16px; accent-color: #14b8a6; cursor: pointer; }
+
+  /* Bottom Panel */
+  .bottom-panel { position: fixed; bottom: 0; left: 0; right: 0; background: #0f1424; border-top: 2px solid rgba(20,184,166,0.35); padding: 12px 32px; display: flex; align-items: center; gap: 16px; z-index: 10; box-shadow: 0 -4px 24px rgba(0,0,0,0.5); }
+  .selected-info { color: #2dd4bf; font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .selected-list { flex: 1; color: #94a3b8; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .copy-btn { background: #14b8a6; color: #070c18; border: none; border-radius: 8px; padding: 10px 24px; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
+  .copy-btn:hover { background: #2dd4bf; }
+  .copy-btn.copied { background: #22c55e; }
+
+  /* Toast */
+  .toast { position: fixed; top: 20px; right: 20px; background: #22c55e; color: #070c18; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; z-index: 100; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+
+  /* Status badges */
+  .status-badge { display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; cursor: pointer; user-select: none; transition: all 0.15s; white-space: nowrap; }
+  .status-badge:hover { filter: brightness(1.2); transform: scale(1.05); }
+  .status-unset  { background: rgba(100,116,139,0.15); color: #94a3b8; border: 1px solid rgba(100,116,139,0.3); }
+  .status-working { background: rgba(34,197,94,0.15); color: #86efac; border: 1px solid rgba(34,197,94,0.35); }
+  .status-broken  { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.35); }
+  .status-needs   { background: rgba(245,158,11,0.15); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+  .status-skip    { background: rgba(100,116,139,0.08); color: #475569; border: 1px solid rgba(100,116,139,0.15); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Firebase Audit Dashboard</h1>
+  <p>155 project folders scanned &mdash; April 2026</p>
+</div>
+
+<div class="stats-bar" id="statsBar"></div>
+
+<div class="controls">
+  <input type="text" class="search-box" id="searchBox" placeholder="Search folder names...">
+  <select id="firebaseFilter">
+    <option value="all">All Firebase Status</option>
+    <option value="yes">Has Firebase</option>
+    <option value="no">No Firebase</option>
+  </select>
+  <select id="typeFilter">
+    <option value="all">All App Types</option>
+    <option value="React">React</option>
+    <option value="HTML">HTML</option>
+    <option value="Node/Other">Node/Other</option>
+    <option value="Next.js">Next.js</option>
+    <option value="unknown">Unknown</option>
+  </select>
+  <button class="btn btn-outline" onclick="selectVisible()">Select Visible</button>
+  <button class="btn btn-teal" onclick="selectNoFirebase()">Select All No-Firebase</button>
+  <button class="btn btn-red" onclick="clearAll()">Clear All</button>
+  <select id="firestoreFilter">
+    <option value="all">All Firestore States</option>
+    <option value="full">✓ Full (Auth + Database)</option>
+    <option value="auth">⚠ Auth Only (No Database)</option>
+    <option value="none">✗ No Firebase</option>
+  </select>
+  <select id="statusFilter">
+    <option value="all">All Statuses</option>
+    <option value="unset">Not Set</option>
+    <option value="working">Working</option>
+    <option value="broken">Broken</option>
+    <option value="needs">Needs Setup</option>
+    <option value="skip">Skip</option>
+  </select>
+  <span class="visible-count" id="visibleCount"></span>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:40px"><input type="checkbox" id="headerCheck" onchange="toggleHeaderCheck(this)"></th>
+        <th onclick="sortBy('index')"># <span class="sort-arrow" id="sort_index"></span></th>
+        <th onclick="sortBy('folder')">Folder Name <span class="sort-arrow" id="sort_folder"></span></th>
+        <th onclick="sortBy('hasFirebase')">Firebase <span class="sort-arrow" id="sort_hasFirebase"></span></th>
+        <th onclick="sortBy('firestoreState')">Firestore DB <span class="sort-arrow" id="sort_firestoreState"></span></th>
+        <th onclick="sortBy('firebaseSource')">Source <span class="sort-arrow" id="sort_firebaseSource"></span></th>
+        <th onclick="sortBy('appType')">Type <span class="sort-arrow" id="sort_appType"></span></th>
+        <th onclick="sortBy('netlifyUrl')">Netlify URL <span class="sort-arrow" id="sort_netlifyUrl"></span></th>
+        <th onclick="sortBy('notes')">Notes <span class="sort-arrow" id="sort_notes"></span></th>
+        <th onclick="sortBy('status')">Status <span class="sort-arrow" id="sort_status"></span></th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
+
+<div class="bottom-panel">
+  <div class="selected-info" id="selectedInfo">0 selected</div>
+  <div class="selected-list" id="selectedList">None</div>
+  <button class="copy-btn" id="copyBtn" onclick="copySelected()">Copy List</button>
+</div>
+
+<div class="toast" id="toast">Copied to clipboard!</div>
+
+<script>
+const DATA = [{"folder":"10-27-25-arnie-newest-updated-website-main-Best-Best","hasFirebase":false,"firebaseSource":"","appType":"unknown","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"22three-redesign","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"AI-Studio-All-In-1-Creator-12-12-25","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"AI-studio-google-latest-app-10-10-25","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"ai-truth-shield","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"arnie-ela-app-seller","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"arnie-ela-sales-command-center","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"arnie-health-tracker-pro-10-3-25","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"arnie-trading-academy","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"arnies-app-showcase","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"https://arnies-app-showcase.netlify.app","netlifyDomain":"arnies-app-showcase","hasPackageJson":false,"notes":""},{"folder":"arnies-experimental-website","hasFirebase":false,"firebaseSource":"","appType":"Node/Other","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"arnies-final-website-2-19-26","hasFirebase":false,"firebaseSource":"","appType":"Node/Other","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"arnies-final-website-2-19-26-backup","hasFirebase":false,"firebaseSource":"","appType":"Node/Other","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"arnies-live-site-backup-march-1-2026","hasFirebase":false,"firebaseSource":"","appType":"Node/Other","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"arnies-portfolio-gallery","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"arnoldshapiro-del-AI-Powered-Enterprise-Platform","hasFirebase":true,"firebaseSource":"index.html","appType":"Node/Other","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"arnoldshapiromd-experimental","hasFirebase":false,"firebaseSource":"","appType":"Node/Other","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"autism-spectrum-guide","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"autismus-spektrum-leitfaden","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"baptist-learning","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"baptist-learning-center","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"bipolar-checklist-german","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"https://bipolar-checklist-german.netlify.app","netlifyDomain":"bipolar-checklist-german","hasPackageJson":false,"notes":""},{"folder":"bipolar-pregnancy-app","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"bipolar-pregnancy-guide","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"bipolar-treatment-chunks-archive","hasFirebase":false,"firebaseSource":"","appType":"unknown","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"Bolt-files-for-chattgpt5-8-14-25-main","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"calm-mind-scheduler-fix","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"catholic-learning","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"catholic-learning-center","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"claude-mastery","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"claude-mastery-guide","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"claude-troubleshooting","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"claude-troubleshooting-guide","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"cleaning-pro-app","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"https://cleaning-pro-app.netlify.app","netlifyDomain":"cleaning-pro-app","hasPackageJson":false,"notes":""},{"folder":"debate-ai","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"debate-ai-build","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"detroit-ultimate-guide","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"devtracker-pro","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"devtraker-pro-v2-10-4-25","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"discover-germany","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"discover-germany-BACKUP","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"discover-israel","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"doc-scribe-sifter","hasFirebase":false,"firebaseSource":"","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"double-top-bottom-teaching","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"https://arnie-double-top-bottom.netlify.app","netlifyDomain":"arnie-double-top-bottom","hasPackageJson":false,"notes":""},{"folder":"dramaheal-deutsch","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"dramaheal-english","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"Dr_Stafford_Goldstein_Jewish_Renaissance","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"ela-3rd-final-real-estate-9-15-25","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"ela-command-center","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"ela-dash-build","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"ela-dashboard-v2-source","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"ela-luxury-realty","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"ela-planner-build","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"ela-realty-pro-source","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"Ela-s-2nd-real-estate-app-9-15-25","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"Ela-s-2nd-Realty-Pro-from-Bolt-9-14-25","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"Ela-s-Daily-Real-Estate-Planner-9-11-25","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"Ela-s-Daily-Real-Estate-Planner-created-9-9-25-in-Gemini-coder","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"elas-social-media-app","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"elas-socialpro-professional","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"entdecke-deutschland","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"floral-design-studio","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"floral-design-studio-deutsch","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"gemini-creative-studio","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"germany-exploration","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"glp1-muscle-truth","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"healthai-pro-genspark","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"hoffnung-und-heilung","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"hope-and-healing","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"israel-exploration","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"jewish-learning","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"knowledge-base-dashboard","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"laser-printer-showdown","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"Law-of-Attraction","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"lds-learning","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"lds-learning-center","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"legal-command-center","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"life-through-the-decades","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"llm-research","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"llm-research-command-center","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"longevity-blueprint","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"lumina-pro-v3","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"md-phd-career-symposium","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"medication-denial-fighter","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"methodist-learning","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"Mindwell-Mood-Tracker-from-Mocha","hasFirebase":false,"firebaseSource":"","appType":"unknown","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"mood-tracker-vite","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"mounjaro-tracker","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"My-first-chatgpt-app-by-codex","hasFirebase":false,"firebaseSource":"","appType":"unknown","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"passport-fortress-v5","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"patient-denial-fighter","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"piriformis-recovery-guide","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"project-control-center","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"protestant-learning","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"protestant-learning-center","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"psycare-Pro","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"psych-ai-repo","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"psychdoc-11-6-25","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"PsychDoc-AI-Assistant-latest-v2-Final-Version-as-of-11-23-25","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"psychdoc-ai-assistant-latest-v2-final-version-as-of-11-23-25 (2)","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"psychdoc-ai-assistant-v2","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"psychdoc-ai-assistant-v2-backup","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"PsychDoc_Analysis","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"PsychDoc_Audio_Fix","hasFirebase":false,"firebaseSource":"","appType":"unknown","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"PsychDoc_Dec20_Extract","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"PsychDoc_Fixed_Files","hasFirebase":false,"firebaseSource":"","appType":"unknown","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"PsychDoc_GitHub_Clone","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"PsychDoc_Jan24_Extract","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"psychguide-pcp","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"psychguide-pcp-v2","hasFirebase":false,"firebaseSource":"","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"psychiatric-reference-app","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"Psychiatry-Patient-Acquisition-Platform-Greater-Cincinnati","hasFirebase":false,"firebaseSource":"","appType":"unknown","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"PsychPharm-Reference-App","hasFirebase":false,"firebaseSource":"","appType":"unknown","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"real-estate-client-tracker","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"real-estate-client-tracker-for-arnie-and-ela","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"realtor-command-center-ela-v2","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"https://realtor-command-center-ela-v2.netlify.app","netlifyDomain":"realtor-command-center-ela-v2","hasPackageJson":false,"notes":""},{"folder":"Reminder-pro-txt-reminders-to-patients","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"reminder-pro-ultimate-8-7-25-Manus","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"roof-reclaim-ohio","hasFirebase":false,"firebaseSource":"","appType":"React","netlifyUrl":"https://roof-reclaim-ohio.netlify.app","netlifyDomain":"roof-reclaim-ohio","hasPackageJson":true,"notes":""},{"folder":"rx-reminders-plus","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"schwester-schreck-ultimativ","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"seo-journey","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"serenity-app-v2-final-therapy-app-from-claude","hasFirebase":false,"firebaseSource":"","appType":"unknown","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"shapiro-vs-irs","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"shapiro-vs-scroggins","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"sin-city-history","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"https://sin-city-history.netlify.app","netlifyDomain":"sin-city-history","hasPackageJson":false,"notes":""},{"folder":"sister-teaser-ultimate","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"software-seller-success","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"south-america-cruise-guide","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"stafford-goldstein-jewish-renaissance","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"stafford-next-stage-of-life","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"staffords-final-next-stage-of-life-12-26-25","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"stillwaters-recovery","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"studio","hasFirebase":false,"firebaseSource":"","appType":"Next.js","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"subscription-manager-app","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"subzero-650-diagnostic","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"tauck-india-guide","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"tauck-vietnam-guide","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"temp-start-spark","hasFirebase":true,"firebaseSource":"package.json","appType":"Next.js","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"tr-disorders-hub","hasFirebase":false,"firebaseSource":"","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"trade-zen-2","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":""},{"folder":"trading-fortress","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"trading-mentor-pro","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"TRD Algorithm","hasFirebase":false,"firebaseSource":"","appType":"unknown","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"trd-algorithm-english","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"trd-algorithm-german","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"treatment-resistant-depression-anxiety","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"troubleshooting-guide","hasFirebase":true,"firebaseSource":"index.html","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"ULTIMATE-MOODVERSE-MEDITATION-CENTER","hasFirebase":false,"firebaseSource":"","appType":"unknown","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":"has netlify.toml"},{"folder":"unis-ta-bootcamp-day1","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"https://unis-ta-bootcamp-day1.netlify.app","netlifyDomain":"unis-ta-bootcamp-day1","hasPackageJson":true,"notes":""},{"folder":"uplifting-patient-remind","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"UsersarnolDesktopPsychDoc-AI-Review","hasFirebase":true,"firebaseSource":"package.json","appType":"React","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"v0-fashionai-trulyfinal","hasFirebase":true,"firebaseSource":"package.json","appType":"Next.js","netlifyUrl":"","netlifyDomain":"","hasPackageJson":true,"notes":"has netlify.toml"},{"folder":"vegas-baby-trip","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"Welltraker-Pro-in-Firebase-Studio","hasFirebase":false,"firebaseSource":"","appType":"unknown","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""},{"folder":"wisdom-library","hasFirebase":false,"firebaseSource":"","appType":"HTML","netlifyUrl":"","netlifyDomain":"","hasPackageJson":false,"notes":""}];
+
+// ── Firestore data persistence tracking ──────────────────────────────────────
+// "Full" means: Firebase auth gate EXISTS + localStorage syncs to Firestore DB
+// "Auth Only" means: Firebase auth gate exists but NO Firestore data persistence
+// Update FIRESTORE_WIRED whenever Claude wires Firestore for an app.
+const FIRESTORE_WIRED = {
+  'unis-ta-bootcamp-day1': true,       // Reference implementation
+  'roof-reclaim-ohio': true,           // Wired 2026-04-16
+  'arnie-trading-academy': true,       // Wired 2026-04-16
+  'mounjaro-tracker': true,            // Wired 2026-04-16
+  'gemini-creative-studio': true,      // Wired 2026-04-16
+  'double-top-bottom-teaching': true,  // Wired 2026-04-16
+};
+
+// Some apps have Firebase compat SDK but the scanner missed it — override here
+const FIREBASE_OVERRIDE = {
+  'arnie-trading-academy': true,
+  'double-top-bottom-teaching': true,
+  'gemini-creative-studio': true,
+  'mounjaro-tracker': true,
+};
+
+// Returns: 'full' | 'auth' | 'none'
+function getFirestoreState(d) {
+  const hasFb = FIREBASE_OVERRIDE[d.folder] || d.hasFirebase;
+  if (!hasFb) return 'none';
+  if (FIRESTORE_WIRED[d.folder]) return 'full';
+  return 'auth';
+}
+
+// Status persistence
+const STATUS_KEY = 'firebase_audit_status';
+const STATUS_CYCLE = ['unset', 'working', 'broken', 'needs', 'skip'];
+const STATUS_LABELS = { unset: '— Not Set', working: '✓ Working', broken: '✗ Broken', needs: '⚙ Needs Setup', skip: '⊘ Skip' };
+const STATUS_SORT_ORDER = { working: 0, broken: 1, needs: 2, skip: 3, unset: 4 };
+
+function loadStatuses() {
+  try { return JSON.parse(localStorage.getItem(STATUS_KEY) || '{}'); } catch { return {}; }
+}
+function saveStatuses(statuses) {
+  localStorage.setItem(STATUS_KEY, JSON.stringify(statuses));
+}
+function getStatus(folder) {
+  return loadStatuses()[folder] || 'unset';
+}
+function cycleStatus(folder) {
+  const statuses = loadStatuses();
+  const current = statuses[folder] || 'unset';
+  const nextIdx = (STATUS_CYCLE.indexOf(current) + 1) % STATUS_CYCLE.length;
+  statuses[folder] = STATUS_CYCLE[nextIdx];
+  saveStatuses(statuses);
+  renderTable();
+  renderStats();
+}
+
+// State
+let selected = new Set();
+let sortCol = 'index';
+let sortAsc = true;
+let filtered = [...DATA];
+
+function getTypeBadgeClass(t) {
+  if (t === 'React') return 'badge-react';
+  if (t === 'HTML') return 'badge-html';
+  if (t === 'Node/Other') return 'badge-node';
+  if (t === 'Next.js') return 'badge-next';
+  return 'badge-unknown';
+}
+
+function renderStats() {
+  const total = DATA.length;
+  const withFb = DATA.filter(d => d.hasFirebase).length;
+  const noFb = total - withFb;
+  const react = DATA.filter(d => d.appType === 'React').length;
+  const html = DATA.filter(d => d.appType === 'HTML').length;
+  const node = DATA.filter(d => d.appType === 'Node/Other').length;
+  const next = DATA.filter(d => d.appType === 'Next.js').length;
+  const unk = DATA.filter(d => d.appType === 'unknown').length;
+  const withUrl = DATA.filter(d => d.netlifyUrl).length;
+  const statuses = loadStatuses();
+  const working = DATA.filter(d => (statuses[d.folder] || 'unset') === 'working').length;
+  const broken  = DATA.filter(d => (statuses[d.folder] || 'unset') === 'broken').length;
+  const needs   = DATA.filter(d => (statuses[d.folder] || 'unset') === 'needs').length;
+  const fsFullCount = DATA.filter(d => getFirestoreState(d) === 'full').length;
+  const fsAuthCount = DATA.filter(d => getFirestoreState(d) === 'auth').length;
+  const fsNoneCount = DATA.filter(d => getFirestoreState(d) === 'none').length;
+
+  document.getElementById('statsBar').innerHTML = `
+    <div class="stat-card"><div class="num">${total}</div><div class="label">Total Apps</div></div>
+    <div style="width:1px;background:rgba(255,255,255,0.08);margin:4px 0"></div>
+    <div class="stat-card" style="border-color:rgba(34,197,94,0.45)"><div class="num" style="color:#4ade80">${fsFullCount}</div><div class="label">✓ Full Firebase</div></div>
+    <div class="stat-card warn"><div class="num">${fsAuthCount}</div><div class="label">⚠ Auth Only</div></div>
+    <div class="stat-card danger"><div class="num">${fsNoneCount}</div><div class="label">✗ No Firebase</div></div>
+    <div style="width:1px;background:rgba(255,255,255,0.08);margin:4px 0"></div>
+    <div class="stat-card"><div class="num">${react}</div><div class="label">React</div></div>
+    <div class="stat-card"><div class="num">${html}</div><div class="label">HTML</div></div>
+    <div class="stat-card"><div class="num">${node}</div><div class="label">Node/Other</div></div>
+    <div class="stat-card"><div class="num">${next}</div><div class="label">Next.js</div></div>
+    <div class="stat-card danger"><div class="num">${unk}</div><div class="label">Unknown</div></div>
+    <div class="stat-card"><div class="num">${withUrl}</div><div class="label">Have Netlify URL</div></div>
+    <div style="width:1px;background:rgba(255,255,255,0.08);margin:4px 0"></div>
+    <div class="stat-card" style="border-color:rgba(34,197,94,0.3)"><div class="num" style="color:#86efac">${working}</div><div class="label">✓ Working</div></div>
+    <div class="stat-card" style="border-color:rgba(239,68,68,0.3)"><div class="num" style="color:#fca5a5">${broken}</div><div class="label">✗ Broken</div></div>
+    <div class="stat-card" style="border-color:rgba(245,158,11,0.3)"><div class="num" style="color:#fcd34d">${needs}</div><div class="label">⚙ Needs Setup</div></div>
+  `;
+}
+
+function applyFilters() {
+  const q = document.getElementById('searchBox').value.toLowerCase();
+  const fb = document.getElementById('firebaseFilter').value;
+  const fs = document.getElementById('firestoreFilter').value;
+  const tp = document.getElementById('typeFilter').value;
+  const st = document.getElementById('statusFilter').value;
+  const statuses = loadStatuses();
+
+  filtered = DATA.filter(d => {
+    if (q && !d.folder.toLowerCase().includes(q)) return false;
+    if (fb === 'yes' && !(FIREBASE_OVERRIDE[d.folder] || d.hasFirebase)) return false;
+    if (fb === 'no' && (FIREBASE_OVERRIDE[d.folder] || d.hasFirebase)) return false;
+    if (fs !== 'all' && getFirestoreState(d) !== fs) return false;
+    if (tp !== 'all' && d.appType !== tp) return false;
+    if (st !== 'all') {
+      const s = statuses[d.folder] || 'unset';
+      if (s !== st) return false;
+    }
+    return true;
+  });
+
+  // Sort
+  if (sortCol === 'index') {
+    if (!sortAsc) filtered = filtered.reverse();
+  } else if (sortCol === 'status') {
+    filtered.sort((a, b) => {
+      const sa = STATUS_SORT_ORDER[statuses[a.folder] || 'unset'];
+      const sb = STATUS_SORT_ORDER[statuses[b.folder] || 'unset'];
+      return sortAsc ? sa - sb : sb - sa;
+    });
+  } else {
+    filtered.sort((a, b) => {
+      let va = a[sortCol], vb = b[sortCol];
+      if (typeof va === 'boolean') { va = va ? 1 : 0; vb = vb ? 1 : 0; }
+      if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+      if (va < vb) return sortAsc ? -1 : 1;
+      if (va > vb) return sortAsc ? 1 : -1;
+      return 0;
+    });
+  }
+
+  renderTable();
+}
+
+function renderTable() {
+  const tbody = document.getElementById('tableBody');
+  let html = '';
+  filtered.forEach((d, i) => {
+    const idx = DATA.indexOf(d) + 1;
+    const checked = selected.has(d.folder) ? 'checked' : '';
+    const rowClass = selected.has(d.folder) ? 'selected' : '';
+    const fsState = getFirestoreState(d);
+    const fbBadge = fsState === 'full'
+      ? '<span class="badge badge-full">✓ FULL</span>'
+      : fsState === 'auth'
+        ? '<span class="badge badge-auth">⚠ AUTH</span>'
+        : '<span class="badge badge-no">✗ NO</span>';
+    const fsDBBadge = fsState === 'full'
+      ? '<span class="badge badge-full">✓ Wired</span>'
+      : fsState === 'auth'
+        ? '<span class="badge badge-auth">Not wired</span>'
+        : '<span style="color:#334155">—</span>';
+    const typeBadge = `<span class="badge ${getTypeBadgeClass(d.appType)}">${d.appType}</span>`;
+    const netlify = d.netlifyUrl
+      ? `<a class="netlify-link" href="${d.netlifyUrl}" target="_blank">${d.netlifyDomain || d.netlifyUrl}</a>`
+      : '<span style="color:#334155">—</span>';
+
+    const status = getStatus(d.folder);
+    const safeFolder = d.folder.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const statusLabel = STATUS_LABELS[status];
+    html += `<tr class="${rowClass}" data-folder="${d.folder}">
+      <td><input type="checkbox" ${checked} onchange="toggleRow('${safeFolder}', this)"></td>
+      <td class="num">${idx}</td>
+      <td class="folder">${d.folder}</td>
+      <td>${fbBadge}</td>
+      <td>${fsDBBadge}</td>
+      <td class="source">${d.firebaseSource || '—'}</td>
+      <td>${typeBadge}</td>
+      <td>${netlify}</td>
+      <td class="notes">${d.notes || ''}</td>
+      <td><span class="status-badge status-${status}" onclick="cycleStatus('${safeFolder}')" title="Click to change status">${statusLabel}</span></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+  document.getElementById('visibleCount').textContent = `Showing ${filtered.length} of ${DATA.length}`;
+  updateBottomPanel();
+}
+
+function toggleRow(folder, checkbox) {
+  if (checkbox.checked) {
+    selected.add(folder);
+  } else {
+    selected.delete(folder);
+  }
+  // Update row highlight
+  const row = checkbox.closest('tr');
+  if (row) row.className = checkbox.checked ? 'selected' : '';
+  updateBottomPanel();
+}
+
+function toggleHeaderCheck(cb) {
+  filtered.forEach(d => {
+    if (cb.checked) selected.add(d.folder);
+    else selected.delete(d.folder);
+  });
+  renderTable();
+}
+
+function selectVisible() {
+  filtered.forEach(d => selected.add(d.folder));
+  renderTable();
+}
+
+function selectNoFirebase() {
+  DATA.filter(d => !d.hasFirebase).forEach(d => selected.add(d.folder));
+  renderTable();
+}
+
+function clearAll() {
+  selected.clear();
+  document.getElementById('headerCheck').checked = false;
+  renderTable();
+}
+
+function updateBottomPanel() {
+  const count = selected.size;
+  document.getElementById('selectedInfo').textContent = `${count} selected`;
+  if (count === 0) {
+    document.getElementById('selectedList').textContent = 'None';
+  } else {
+    const names = [...selected].sort();
+    document.getElementById('selectedList').textContent = names.join(', ');
+  }
+}
+
+function copySelected() {
+  if (selected.size === 0) return;
+  const text = [...selected].sort().join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => {
+      btn.textContent = 'Copy List';
+      btn.classList.remove('copied');
+      toast.classList.remove('show');
+    }, 2000);
+  });
+}
+
+function sortBy(col) {
+  // Clear arrows
+  document.querySelectorAll('.sort-arrow').forEach(el => el.textContent = '');
+  if (sortCol === col) {
+    sortAsc = !sortAsc;
+  } else {
+    sortCol = col;
+    sortAsc = true;
+  }
+  const arrow = document.getElementById('sort_' + col);
+  if (arrow) arrow.textContent = sortAsc ? '\u25B2' : '\u25BC';
+  applyFilters();
+}
+
+// Event listeners
+document.getElementById('searchBox').addEventListener('input', applyFilters);
+document.getElementById('firebaseFilter').addEventListener('change', applyFilters);
+document.getElementById('firestoreFilter').addEventListener('change', applyFilters);
+document.getElementById('typeFilter').addEventListener('change', applyFilters);
+document.getElementById('statusFilter').addEventListener('change', applyFilters);
+
+// Init
+renderStats();
+applyFilters();
+</script>
+</body>
+</html>
